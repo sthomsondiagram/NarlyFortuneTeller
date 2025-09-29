@@ -7,7 +7,7 @@ It takes a question (currently hard-coded), gets a response from an AI model, fo
 
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/YOURORG/fortune-service.git
+git clone https://github.com/sthomsondiagram/NarlyFortuneTeller.git
 cd fortune-service
 ```
 
