@@ -21,8 +21,9 @@ def main():
     if args.dry_run:
         print(ticket)
     else:
-        print_ticket(ticket)
-        print("Printed.")
+        #print_ticket(ticket)
+        #print("Printed.")
+        print(ticket)
 
 if __name__ == "__main__":
     main()
