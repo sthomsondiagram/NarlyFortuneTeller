@@ -2,3 +2,4 @@ python-dotenv
 textwrap3
 python-escpos
 openai
+pyserial>=3.5,<4.0
