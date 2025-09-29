@@ -78,7 +78,7 @@ Non-devs can edit `content.json` to adjust the tone, rules, and header/footer.
 ---
 
 ## Next Steps
-- Integrate the **coin acceptor** into Arduino and send "COIN" messages.  
+- Integrate the **coin acceptor** into Arduino and send "COIN" messages...  
 - Decide whether to use mic, coin, or both as triggers.  
 - Add sound/LED feedback in Arduino when printing starts.  
 - Optional: Wrap `app.py` in a simple HTTP API for remote debugging.
