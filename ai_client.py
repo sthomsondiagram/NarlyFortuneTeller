@@ -1,12 +1,12 @@
 import os
 import json
 from dotenv import load_dotenv
+from config_loader import load_config
 load_dotenv()
 
 def get_ai_response(question: str) -> str:
     provider = os.getenv("AI_PROVIDER", "openai").lower()
-    with open("content.json", "r", encoding="utf-8") as f:
-        cfg = json.load(f)
+    cfg = load_config("content.json")
 
     system_prompt = cfg["system_prompt"]
     max_chars = cfg["style_rules"]["max_chars"]
