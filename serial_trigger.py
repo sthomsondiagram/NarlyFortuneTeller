@@ -40,10 +40,12 @@ def record_and_transcribe():
     try:
         with mic as source:
             recognizer.adjust_for_ambient_noise(source, duration=0.5)
-            # Increase phrase_time_limit to allow longer questions
-            # Adjust pause_threshold to be more forgiving of mid-sentence pauses
-            recognizer.pause_threshold = 1.5  # Wait 1.5 seconds of silence before considering phrase complete
-            audio = recognizer.listen(source, timeout=10, phrase_time_limit=15)
+            # Improved settings to capture full questions
+            recognizer.pause_threshold = 2.5  # Wait longer for natural pauses (was 1.5)
+            recognizer.energy_threshold = 300  # Lower threshold for better detection
+            recognizer.dynamic_energy_threshold = True  # Adapt to ambient noise
+            # Increase limits to allow longer questions
+            audio = recognizer.listen(source, timeout=10, phrase_time_limit=20)
 
         print("  🧠 Transcribing...")
         text = recognizer.recognize_google(audio)
