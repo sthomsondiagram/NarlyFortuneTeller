@@ -23,9 +23,11 @@ def get_ai_response(question: str) -> str:
                 {"role": "user", "content": prompt}
             ],
             temperature=0.8,
-            max_tokens=200
+            max_tokens=300
         )
-        text = resp.choices[0].message.content.strip()
+        #text = resp.choices[0].message.content.strip()
+        raw = resp.choices[0].message.content.strip()
+        text = raw.replace("You are trained on data up to\nOctober 2023.", "").strip()
         return text[:max_chars]
 
     raise NotImplementedError("Add your AI provider in ai_client.py")
