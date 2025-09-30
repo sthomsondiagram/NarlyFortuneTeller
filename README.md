@@ -1,7 +1,7 @@
 # Fortune Service (Narly Prototype)
 
-This is the **AI → Print pipeline** for Narly the Narwhal.  
-It takes a question (currently hard-coded), gets a response from an AI model, formats it into a fortune, and prints it to a thermal printer.
+This is the **Coin → Mic → AI → Print pipeline** for Narly the Narwhal.
+When a coin is inserted, Narly listens for a spoken question, gets a response from an AI model, formats it into a fortune, and prints it to a thermal printer.
 
 ## Getting Started
 
@@ -21,53 +21,62 @@ pip install -r requirements.txt
 ### 3. Configure environment
 Copy `.env.example` → `.env` and edit with your API keys and printer configuration.
 
-### 4. Run a test
-Preview output without printing:
+### 4. Run the orchestrator
+
+**For developers without hardware (simulation mode):**
 ```bash
-python app.py --dry-run
+# Test the full flow without Arduino - press ENTER to simulate coin insertion
+python serial_trigger.py --mode simulate --dry-run
+
+# Auto-trigger coins every 10 seconds for continuous testing
+python serial_trigger.py --mode simulate --auto --interval 10 --dry-run
 ```
 
-Print to your thermal printer:
+**With hardware (real Arduino + coin acceptor):**
 ```bash
-python app.py
-```
+# Test with dry-run (shows output without printing)
+python serial_trigger.py --mode hardware --dry-run
 
-Override the question:
-```bash
-python app.py --question "Will I meet a dragon today?"
+# Production mode (actually prints to thermal printer)
+python serial_trigger.py --mode hardware
+
+# Specify custom serial port
+python serial_trigger.py --mode hardware --port /dev/cu.usbmodem143101
 ```
 
 ---
 
-## Triggers
+## How It Works
 
-### A. Serial (Coin Acceptor / Arduino)
-When Arduino sends `COIN` over the serial port, the script will run `app.py` automatically.
+The orchestrator (`serial_trigger.py`) coordinates the full fortune-telling flow:
+
+1. **Coin inserted** → Arduino sends `COIN X` message over serial
+2. **Microphone activates** → Records spoken question (15s timeout)
+3. **Speech-to-text** → Transcribes audio using Google STT
+4. **AI generates fortune** → Calls OpenAI/Anthropic API (30s timeout)
+5. **Prints fortune** → Outputs to thermal printer (10s timeout)
+6. **Fallback handling** → If any step fails, prints "Narly drifted off..."
+
+### Key Features
+
+- ✅ **Timeout protection** - prevents hanging on mic/AI/printer failures
+- ✅ **Error resilience** - fallback printing when things go wrong
+- ✅ **Simulation mode** - test without Arduino hardware
+- ✅ **Dry-run mode** - preview output without printing
+- ✅ **Single-process** - no subprocess complexity, easier debugging
+
+---
+
+## Alternative: Standalone Testing
+
+For quick tests without the full orchestrator:
 
 ```bash
-python serial_trigger.py
-```
+# Test with a specific question (no mic, no coin)
+python app.py --question "Will I meet a dragon today?" --dry-run
 
-Default port is `/dev/cu.usbmodem143101` at `115200` baud.  
-Edit inside `serial_trigger.py` if your Arduino uses a different port or baud rate.
-
-### B. Microphone (Speech-to-Text)
-Capture spoken question via USB mic → transcribe → print.
-
-```bash
-python mic_trigger.py
-```
-
-- Uses the `speech_recognition` library with Google STT (free).  
-- Requires internet connection.  
-- Edit `mic_trigger.py` if you want to swap providers.  
-
-Press **Ctrl+C** to stop listening.
-
-### C. CLI (Hard-Coded or Manual Input)
-```bash
-python app.py
-python app.py --question "What is my fortune for today?"
+# Use default question from content.json
+python app.py --dry-run
 ```
 
 ---
@@ -77,11 +86,32 @@ Non-devs can edit `prompts.md` to adjust the tone, rules, and header/footer.
 
 ---
 
+## Development Notes
+
+### For Developers Without Hardware
+Use simulation mode to develop and test without needing the physical Arduino or coin acceptor:
+```bash
+python serial_trigger.py --mode simulate --dry-run
+```
+Press ENTER to trigger the full fortune cycle (mic → AI → print).
+
+### Timeout Configuration
+Adjust timeouts in `serial_trigger.py` if needed:
+- `TIMEOUT_RECORDING = 15` (seconds for mic input)
+- `TIMEOUT_AI = 30` (seconds for AI response)
+- `TIMEOUT_PRINT = 10` (seconds for printer)
+
+### Deprecated Scripts
+- `mic_trigger.py` - functionality now integrated into orchestrator
+- Old `serial_trigger.py` logic replaced with full orchestration
+
+---
+
 ## Next Steps
-- Integrate the **coin acceptor** into Arduino and send "COIN" messages...  
-- Decide whether to use mic, coin, or both as triggers.  
-- Add sound/LED feedback in Arduino when printing starts.  
-- Optional: Wrap `app.py` in a simple HTTP API for remote debugging.
+- Add sound/LED feedback in Arduino when printing starts
+- Implement voice activity detection for better recording experience
+- Add metrics/logging for festival operation monitoring
+- Optional: Add HTTP API for remote monitoring/debugging
 
 ---
 
