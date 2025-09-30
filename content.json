@@ -9,7 +9,7 @@
     ]
   },
   "header": "- Narly's Fortune -",
-  "footer": "Thank you, traveler.",
+  "footer": "- Narly",
   "default_question": "What is my fortune for today?",
   "system_prompt_file": "prompts.md"
 }
