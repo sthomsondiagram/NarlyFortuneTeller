@@ -1,5 +1,6 @@
 {
   "style_rules": {
+    "max_chars": 320,
     "tone": "lightly cryptic, playful, benevolent",
     "avoid": [
       "diagnoses",
