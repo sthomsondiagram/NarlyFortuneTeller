@@ -48,7 +48,7 @@ When Arduino sends `COIN` over the serial port, the script will run `app.py` aut
 python serial_trigger.py
 ```
 
-Default port is `/dev/tty.usbmodem14101` at `115200` baud.  
+Default port is `/dev/cu.usbmodem143101` at `115200` baud.  
 Edit inside `serial_trigger.py` if your Arduino uses a different port or baud rate.
 
 ### B. Microphone (Speech-to-Text)
@@ -73,7 +73,7 @@ python app.py --question "What is my fortune for today?"
 ---
 
 ## Editing Persona & Style
-Non-devs can edit `content.json` to adjust the tone, rules, and header/footer.
+Non-devs can edit `prompts.md` to adjust the tone, rules, and header/footer.
 
 ---
 
