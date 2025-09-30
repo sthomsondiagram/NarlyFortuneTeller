@@ -40,7 +40,10 @@ def record_and_transcribe():
     try:
         with mic as source:
             recognizer.adjust_for_ambient_noise(source, duration=0.5)
-            audio = recognizer.listen(source, timeout=10, phrase_time_limit=10)
+            # Increase phrase_time_limit to allow longer questions
+            # Adjust pause_threshold to be more forgiving of mid-sentence pauses
+            recognizer.pause_threshold = 1.5  # Wait 1.5 seconds of silence before considering phrase complete
+            audio = recognizer.listen(source, timeout=10, phrase_time_limit=15)
 
         print("  🧠 Transcribing...")
         text = recognizer.recognize_google(audio)
@@ -144,9 +147,12 @@ def print_fallback(dry_run: bool = False):
                 future.result(timeout=TIMEOUT_PRINT)
             print("  ✓ Fallback printed")
         except TimeoutError:
-            print(f"  ✗ Fallback print timeout ({TIMEOUT_PRINT}s)")
+            print(f"  ✗ Fallback print timeout ({TIMEOUT_PRINT}s) - showing on console:")
+            print("\n" + ticket + "\n")
         except Exception as e:
             print(f"  ✗ Could not print fallback: {e}")
+            print("  → Showing fallback on console instead:")
+            print("\n" + ticket + "\n")
 
 def on_coin_event(pulses: int, dry_run: bool = False):
     """

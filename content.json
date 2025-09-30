@@ -8,7 +8,7 @@
       "guarantees"
     ]
   },
-  "header": "— Narly’s Fortune —",
+  "header": "- Narly's Fortune -",
   "footer": "Thank you, traveler.",
   "default_question": "What is my fortune for today?",
   "system_prompt_file": "prompts.md"
