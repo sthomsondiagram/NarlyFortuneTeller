@@ -23,7 +23,7 @@ def get_ai_response(question: str) -> str:
                 {"role": "user", "content": prompt}
             ],
             temperature=0.8,
-            max_tokens=500
+            max_tokens=1500
         )
         #text = resp.choices[0].message.content.strip()
         raw = resp.choices[0].message.content.strip()
