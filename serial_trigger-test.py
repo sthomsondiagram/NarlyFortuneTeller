@@ -76,13 +76,13 @@ def record_and_transcribe():
     print("  🎤 Listening for question...")
     try:
         with mic as source:
-            recognizer.adjust_for_ambient_noise(source, duration=0.2)
-            # Capture natural pauses a bit longer
-            recognizer.pause_threshold = 2.5
-            recognizer.energy_threshold = 300
-            recognizer.dynamic_energy_threshold = True
-            # Reasonable capture window
-            audio = recognizer.listen(source, timeout=10, phrase_time_limit=20)
+            recognizer.adjust_for_ambient_noise(source, duration=1.0)
+            # Settings tuned for noisy environments
+            recognizer.pause_threshold = 1.2  # Shorter pause to detect end of speech
+            recognizer.energy_threshold = 800  # Higher threshold to ignore background noise
+            recognizer.dynamic_energy_threshold = False  # Use fixed threshold
+            # Reasonable limits for questions
+            audio = recognizer.listen(source, timeout=10, phrase_time_limit=15)
 
         print("  🧠 Transcribing...")
         text = recognizer.recognize_google(audio)
@@ -103,12 +103,22 @@ def record_and_transcribe():
 
 def record_and_transcribe_with_timeout():
     """Wrapper to enforce timeout on recording/transcription."""
+    result = {"text": None}
+
+    def record_wrapper():
+        result["text"] = record_and_transcribe()
+        return result["text"]
+
     with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(record_and_transcribe)
+        future = executor.submit(record_wrapper)
         try:
             return future.result(timeout=TIMEOUT_RECORDING)
         except TimeoutError:
             print(f"  ⚠ Recording timeout ({TIMEOUT_RECORDING}s exceeded)")
+            # Check if we got partial results before timeout
+            if result["text"]:
+                print(f"  → Using partial transcription: {result['text']}")
+                return result["text"]
             return None
         except Exception as e:
             print(f"  ⚠ Unexpected error during recording: {e}")
@@ -275,6 +285,12 @@ def listen_serial_mode(port: str, dry_run: bool = False):
             if not raw:
                 continue
             raw = raw.strip()
+
+            # Skip Arduino boot/ready messages
+            if "ready" in raw.lower() or "arduino" in raw.lower():
+                print(f"[arduino] {raw}")
+                continue
+
             m = line_re.match(raw)
             if m:
                 pulses = int(m.group(1))
