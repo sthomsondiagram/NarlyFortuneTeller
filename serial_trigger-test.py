@@ -79,7 +79,7 @@ def record_and_transcribe():
             recognizer.adjust_for_ambient_noise(source, duration=1.0)
             # Settings tuned for noisy environments
             recognizer.pause_threshold = 1.2  # Shorter pause to detect end of speech
-            recognizer.energy_threshold = 800  # Higher threshold to ignore background noise
+            recognizer.energy_threshold = 1000  # Higher threshold to ignore background noise
             recognizer.dynamic_energy_threshold = False  # Use fixed threshold
             # Reasonable limits for questions
             audio = recognizer.listen(source, timeout=10, phrase_time_limit=15)
@@ -115,9 +115,11 @@ def record_and_transcribe_with_timeout():
             return future.result(timeout=TIMEOUT_RECORDING)
         except TimeoutError:
             print(f"  ⚠ Recording timeout ({TIMEOUT_RECORDING}s exceeded)")
-            # Check if we got partial results before timeout
+            # Wait briefly for transcription to complete (it may have captured audio)
+            time.sleep(2)
+            # Check if we got results after timeout
             if result["text"]:
-                print(f"  → Using partial transcription: {result['text']}")
+                print(f"  → Using transcription that completed during timeout: {result['text']}")
                 return result["text"]
             return None
         except Exception as e:
@@ -279,6 +281,14 @@ def listen_serial_mode(port: str, dry_run: bool = False):
     ser = serial.Serial(port, BAUD, timeout=1)
     line_re = re.compile(r"^\s*COIN\s+(\d+)\s*$")
 
+    # Allow Arduino to settle and ignore spurious signals during boot
+    print("   Initializing Arduino...")
+    time.sleep(3)
+    ser.reset_input_buffer()  # Clear any buffered boot messages
+    print("   Ready!\n")
+
+    first_coin_ignored = False  # Flag to ignore first spurious coin signal
+
     try:
         while True:
             raw = ser.readline().decode("utf-8", errors="ignore")
@@ -293,6 +303,12 @@ def listen_serial_mode(port: str, dry_run: bool = False):
 
             m = line_re.match(raw)
             if m:
+                # Ignore the first COIN signal (likely spurious from boot)
+                if not first_coin_ignored:
+                    print(f"[arduino] Ignoring first coin signal: {raw}")
+                    first_coin_ignored = True
+                    continue
+
                 pulses = int(m.group(1))
                 on_coin_event(pulses, dry_run)
             else:
