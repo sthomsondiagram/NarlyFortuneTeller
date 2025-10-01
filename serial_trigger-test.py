@@ -1,33 +1,52 @@
 # serial_trigger.py - Orchestrates the full fortune-telling flow
-import serial
+# Adds short audio cues (afplay) and fail-safe LED cues without changing core logic.
+
 import sys
 import re
 import argparse
 import json
+import subprocess
+import serial
+import time
 import speech_recognition as sr
-import subprocess  # add this
-from led_client import LedClient  # add this
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+
 from ai_client import get_ai_response
 from formatters import render_ticket
 from print_client import print_ticket
 from config_loader import load_config
 
+# ---- Optional LED client (safe no-op if missing) ----
+try:
+    from led_client import LedClient  # separate file providing a no-op-safe serial wrapper
+except Exception:
+    class LedClient:  # fallback no-op
+        def __init__(self, *a, **kw): pass
+        def start(self, *a, **kw): pass
+        def stop(self): pass
+        def close(self): pass
+
+# ---- Serial config ----
 PORT = "/dev/cu.usbmodem143101"  # Change to your Arduino port, e.g. "COM4" on Windows
 BAUD = 115200
 
-# Timeout configuration (in seconds)
+# ---- Timeout configuration (in seconds) ----
 TIMEOUT_RECORDING = 15      # Max time to wait for speech input
-TIMEOUT_AI = 30             # Max time for AI response
-TIMEOUT_PRINT = 10          # Max time for printing
+TIMEOUT_AI        = 30      # Max time for AI response
+TIMEOUT_PRINT     = 10      # Max time for printing
 
-# Optional LED + audio cues (safe to leave as-is if files/devices absent)
-LED_PORT = PORT           # usually the same Arduino as your coin reader
-SFX_START = "sfx_start.wav"   # ~300–600 ms; “recording starting”
-SFX_END   = "sfx_end.wav"     # ~400–800 ms; “done”
+# ---- Audio cues (short files placed next to this script) ----
+SFX_START = "sfx_start_new.wav"   # 7s audio with 2s fade
+SFX_END   = "sfx_end_new.wav"     # end sound
 
+# LED control usually shares the same board/port
+LED_PORT = PORT  # override with --port if you use a separate LED Arduino
+
+# ----------------------------------------
+# Helpers
+# ----------------------------------------
 def afplay(path: str):
-    """Play a short WAV/AIFF/MP3 via macOS afplay. No crash if missing."""
+    """Play a short WAV/AIFF/MP3 via macOS 'afplay'. Never crash if missing."""
     if not path:
         return
     try:
@@ -36,8 +55,7 @@ def afplay(path: str):
         pass
 
 def find_port():
-    # If you know the exact device, set PORT = "/dev/tty.usbmodemXYZ" or "COM4".
-    # Otherwise, do a small probe.
+    """Try to auto-detect an Arduino-like serial device if --port not provided."""
     try:
         import serial.tools.list_ports
         for p in serial.tools.list_ports.comports():
@@ -47,6 +65,9 @@ def find_port():
         pass
     return None
 
+# ----------------------------------------
+# Recording / Transcription
+# ----------------------------------------
 def record_and_transcribe():
     """Record audio from microphone and transcribe to text."""
     recognizer = sr.Recognizer()
@@ -55,12 +76,12 @@ def record_and_transcribe():
     print("  🎤 Listening for question...")
     try:
         with mic as source:
-            recognizer.adjust_for_ambient_noise(source, duration=0.5)
-            # Improved settings to capture full questions
-            recognizer.pause_threshold = 2.5  # Wait longer for natural pauses (was 1.5)
-            recognizer.energy_threshold = 300  # Lower threshold for better detection
-            recognizer.dynamic_energy_threshold = True  # Adapt to ambient noise
-            # Increase limits to allow longer questions
+            recognizer.adjust_for_ambient_noise(source, duration=0.2)
+            # Capture natural pauses a bit longer
+            recognizer.pause_threshold = 2.5
+            recognizer.energy_threshold = 300
+            recognizer.dynamic_energy_threshold = True
+            # Reasonable capture window
             audio = recognizer.listen(source, timeout=10, phrase_time_limit=20)
 
         print("  🧠 Transcribing...")
@@ -93,6 +114,9 @@ def record_and_transcribe_with_timeout():
             print(f"  ⚠ Unexpected error during recording: {e}")
             return None
 
+# ----------------------------------------
+# AI generation
+# ----------------------------------------
 def generate_fortune(question: str) -> str:
     """Call AI to generate fortune response."""
     print("  🔮 Generating fortune...")
@@ -117,6 +141,9 @@ def generate_fortune_with_timeout(question: str):
             print(f"  ⚠ Unexpected error during AI generation: {e}")
             return None
 
+# ----------------------------------------
+# Printing
+# ----------------------------------------
 def print_fortune(fortune: str, dry_run: bool = False):
     """Format and print fortune ticket."""
     print("  🖨️  Printing fortune...")
@@ -152,7 +179,7 @@ def print_fallback(dry_run: bool = False):
     fallback_msg = "Narly drifted off in the currents... try again in a moment."
     ticket = render_ticket(fallback_msg)
 
-    print("  ⚠ Printing fallback message...")
+    print("  ⚠ Printing fallback message.")
     if dry_run:
         print("\n--- FALLBACK (DRY RUN) ---")
         print(ticket)
@@ -172,6 +199,9 @@ def print_fallback(dry_run: bool = False):
             print("  → Showing fallback on console instead:")
             print("\n" + ticket + "\n")
 
+# ----------------------------------------
+# Coin event flow with audio + LEDs
+# ----------------------------------------
 def on_coin_event(pulses: int, dry_run: bool = False):
     """
     Main orchestration: triggered when coin is inserted.
@@ -180,17 +210,31 @@ def on_coin_event(pulses: int, dry_run: bool = False):
     """
     print(f"\n💰 [COIN EVENT] pulses={pulses}")
 
+    # Create a safe LED client (no-op if not available)
+    led = LedClient(LED_PORT, BAUD)
+
     try:
-        # Step 1: Record and transcribe (with timeout)
+        # Start cue: quick pulse + short sting
+        led.start("PULSE")
+        afplay(SFX_START)
+        led.stop()
+
+        # Step 1: Record and transcribe (with timeout) — show "listening"
+        # Note: ambient noise calibration (0.5s) provides natural delay after audio
+        led.start("GLOW")
         question = record_and_transcribe_with_timeout()
+        led.stop()
+
         if not question:
             cfg = load_config("content.json")
             question = cfg.get("default_question", "What is my fortune?")
             print(f"  → Using default question: {question}")
 
-        # Step 2: Generate fortune (with timeout)
+        # Step 2: Generate fortune (with timeout) — show "thinking"
+        led.start("SPARKLE")
         fortune = generate_fortune_with_timeout(question)
         if not fortune:
+            led.stop()
             print_fallback(dry_run)
             return
 
@@ -199,13 +243,24 @@ def on_coin_event(pulses: int, dry_run: bool = False):
             print_fortune_with_timeout(fortune, dry_run)
             print("✓ Fortune cycle complete\n")
         except Exception:
-            # If printing fortune fails, try fallback
             print_fallback(dry_run)
+        finally:
+            led.stop()
+
+        # End cue: brief pulse + short sting (visually “done”)
+        led.start("PULSE")
+        afplay(SFX_END)
+        led.stop()
 
     except Exception as e:
         print(f"  ✗ Unexpected error in coin event handler: {e}")
         print_fallback(dry_run)
+    finally:
+        led.close()
 
+# ----------------------------------------
+# Modes
+# ----------------------------------------
 def listen_serial_mode(port: str, dry_run: bool = False):
     """Listen for COIN X messages from Arduino on serial port."""
     print(f"🔌 Hardware mode: Listening on {port} @ {BAUD}...")
@@ -225,8 +280,8 @@ def listen_serial_mode(port: str, dry_run: bool = False):
                 pulses = int(m.group(1))
                 on_coin_event(pulses, dry_run)
             else:
-                # Optionally log other Arduino messages for debugging
-                if raw:  # Only log non-empty messages
+                # Optional debug output
+                if raw:
                     print(f"[arduino] {raw}")
     except KeyboardInterrupt:
         print("\n\n🛑 Exiting serial mode.")
@@ -238,12 +293,11 @@ def simulate_mode(dry_run: bool = False, auto: bool = False, interval: int = 10)
     print("🎮 Simulation mode")
     if auto:
         print(f"   Auto-triggering every {interval} seconds (Ctrl+C to stop)\n")
-        import time
         try:
             while True:
                 print("[AUTO] Simulating coin insertion...")
                 on_coin_event(pulses=1, dry_run=dry_run)
-                time.sleep(interval)
+                import time as _t; _t.sleep(interval)
         except KeyboardInterrupt:
             print("\n\n🛑 Exiting simulation mode.")
     else:
@@ -255,8 +309,11 @@ def simulate_mode(dry_run: bool = False, auto: bool = False, interval: int = 10)
         except KeyboardInterrupt:
             print("\n\n🛑 Exiting simulation mode.")
 
+# ----------------------------------------
+# CLI
+# ----------------------------------------
 def main():
-    global PORT
+    global PORT, LED_PORT
 
     parser = argparse.ArgumentParser(
         description="Narly Fortune Orchestrator - coordinates coin → mic → AI → print flow"
@@ -290,6 +347,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Keep LED port aligned to main serial unless you override at runtime
+    PORT = args.port or PORT
+    LED_PORT = PORT
 
     if args.mode == "hardware":
         port = args.port or find_port()
