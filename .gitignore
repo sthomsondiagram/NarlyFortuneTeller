@@ -6,3 +6,5 @@ __pycache__/
 *.pyd
 *.db
 *.sqlite3
+*.wav
+.DS_Store

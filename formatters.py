@@ -1,5 +1,5 @@
 import textwrap
-import json
+
 
 def sanitize_for_thermal_printer(text: str) -> str:
     """Replace Unicode characters that thermal printers can't handle with ASCII equivalents."""
@@ -17,12 +17,18 @@ def sanitize_for_thermal_printer(text: str) -> str:
         text = text.replace(unicode_char, ascii_char)
     return text
 
-def render_ticket(message: str) -> str:
-    with open("content.json", "r", encoding="utf-8") as f:
-        cfg = json.load(f)
 
-    header = cfg.get("header", "")
-    footer = cfg.get("footer", "")
+def render_ticket(message: str, config: dict = None) -> str:
+    """Format a fortune message as a thermal printer ticket.
+
+    If config is not provided, loads the default persona config.
+    """
+    if config is None:
+        from config_loader import load_config
+        config = load_config()
+
+    header = config.get("header", "")
+    footer = config.get("footer", "")
     width = 32
 
     # Sanitize all text for thermal printer

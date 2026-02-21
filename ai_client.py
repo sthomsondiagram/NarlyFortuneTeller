@@ -1,13 +1,23 @@
 import os
-import json
 from dotenv import load_dotenv
 from config_loader import load_config
 load_dotenv()
 
-def get_ai_response(question: str) -> str:
-    provider = os.getenv("AI_PROVIDER", "openai").lower()
-    cfg = load_config("content.json")
+# Module-level config cache -- set by init_ai() or lazily on first call
+_config = None
 
+
+def init_ai(persona: str = "default"):
+    """Pre-load config for a specific persona. Call once at startup."""
+    global _config
+    _config = load_config(persona)
+
+
+def get_ai_response(question: str) -> str:
+    """Generate a fortune using the AI provider."""
+    cfg = _config or load_config()
+
+    provider = os.getenv("AI_PROVIDER", "openai").lower()
     system_prompt = cfg["system_prompt"]
     max_chars = cfg["style_rules"]["max_chars"]
 
@@ -25,7 +35,6 @@ def get_ai_response(question: str) -> str:
             temperature=0.8,
             max_tokens=1500
         )
-        #text = resp.choices[0].message.content.strip()
         raw = resp.choices[0].message.content.strip()
         text = raw.replace("You are trained on data up to October 2023.", "").strip()
         return text[:max_chars]

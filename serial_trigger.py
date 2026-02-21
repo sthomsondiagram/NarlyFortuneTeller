@@ -4,17 +4,17 @@
 import sys
 import re
 import argparse
-import json
 import subprocess
 import serial
 import time
 import speech_recognition as sr
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-from ai_client import get_ai_response
+from ai_client import get_ai_response, init_ai
 from formatters import render_ticket
 from print_client import print_ticket
-from config_loader import load_config
+from config_loader import load_config, list_personas
 
 # ---- Optional LED client (safe no-op if missing) ----
 try:
@@ -26,6 +26,9 @@ except Exception:
         def stop(self): pass
         def close(self): pass
 
+# ---- Paths ----
+_BASE_DIR = Path(__file__).resolve().parent
+
 # ---- Serial config ----
 PORT = "/dev/cu.usbmodem143101"  # Change to your Arduino port, e.g. "COM4" on Windows
 BAUD = 115200
@@ -35,19 +38,22 @@ TIMEOUT_RECORDING = 15      # Max time to wait for speech input
 TIMEOUT_AI        = 30      # Max time for AI response
 TIMEOUT_PRINT     = 10      # Max time for printing
 
-# ---- Audio cues (short files placed next to this script) ----
-SFX_START = "sfx_magic.mp3"      # Plays when mic is ready - user can speak
-SFX_END   = "sfx_generate.mp3"   # Plays when AI starts generating
+# ---- Audio cues ----
+SFX_START = str(_BASE_DIR / "sfx" / "sfx_magic.mp3")      # Plays when mic is ready
+SFX_END   = str(_BASE_DIR / "sfx" / "sfx_generate.mp3")   # Plays when AI starts generating
 
 # LED control usually shares the same board/port
 LED_PORT = PORT  # override with --port if you use a separate LED Arduino
+
+# ---- Module-level config (set at startup by main()) ----
+_config = None
 
 # ----------------------------------------
 # Helpers
 # ----------------------------------------
 def afplay(path: str, wait=False, volume=1.0):
     """Play a short WAV/AIFF/MP3 via macOS 'afplay'. Never crash if missing."""
-    if not path:
+    if not path or not Path(path).exists():
         return
     try:
         if wait:
@@ -158,7 +164,7 @@ def print_fortune(fortune: str, dry_run: bool = False):
     """Format and print fortune ticket."""
     print("  🖨️  Printing fortune...")
     try:
-        ticket = render_ticket(fortune)
+        ticket = render_ticket(fortune, _config)
         if dry_run:
             print("\n--- DRY RUN OUTPUT ---")
             print(ticket)
@@ -185,9 +191,8 @@ def print_fortune_with_timeout(fortune: str, dry_run: bool = False):
 
 def print_fallback(dry_run: bool = False):
     """Print fallback message when something goes wrong."""
-    cfg = load_config("content.json")
     fallback_msg = "Narly drifted off in the currents... try again in a moment."
-    ticket = render_ticket(fallback_msg)
+    ticket = render_ticket(fallback_msg, _config)
 
     print("  ⚠ Printing fallback message.")
     if dry_run:
@@ -230,8 +235,7 @@ def on_coin_event(pulses: int, dry_run: bool = False):
         led.stop()
 
         if not question:
-            cfg = load_config("content.json")
-            question = cfg.get("default_question", "What is my fortune?")
+            question = _config.get("default_question", "What is my fortune?") if _config else "What is my fortune?"
             print(f"  → Using default question: {question}")
 
         # Step 2: Generate fortune (with timeout) — show "thinking"
@@ -317,7 +321,7 @@ def simulate_mode(dry_run: bool = False, auto: bool = False, interval: int = 10)
             while True:
                 print("[AUTO] Simulating coin insertion...")
                 on_coin_event(pulses=1, dry_run=dry_run)
-                import time as _t; _t.sleep(interval)
+                time.sleep(interval)
         except KeyboardInterrupt:
             print("\n\n🛑 Exiting simulation mode.")
     else:
@@ -333,7 +337,7 @@ def simulate_mode(dry_run: bool = False, auto: bool = False, interval: int = 10)
 # CLI
 # ----------------------------------------
 def main():
-    global PORT, LED_PORT
+    global PORT, LED_PORT, _config
 
     parser = argparse.ArgumentParser(
         description="Narly Fortune Orchestrator - coordinates coin → mic → AI → print flow"
@@ -365,8 +369,30 @@ def main():
         default=10,
         help="Seconds between auto-triggered coins in simulate mode (default: 10)"
     )
+    parser.add_argument(
+        "--persona",
+        default="default",
+        help="Persona to use (directory name under personas/). Default: 'default'"
+    )
+    parser.add_argument(
+        "--list-personas",
+        action="store_true",
+        help="List available personas and exit"
+    )
 
     args = parser.parse_args()
+
+    # List personas and exit if requested
+    if args.list_personas:
+        print("Available personas:")
+        for name in list_personas():
+            print(f"  {name}")
+        sys.exit(0)
+
+    # Load persona config once at startup
+    _config = load_config(args.persona)
+    init_ai(args.persona)
+    print(f"Persona: {_config['_persona_name']}")
 
     # Keep LED port aligned to main serial unless you override at runtime
     PORT = args.port or PORT
