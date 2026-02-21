@@ -36,8 +36,8 @@ TIMEOUT_AI        = 30      # Max time for AI response
 TIMEOUT_PRINT     = 10      # Max time for printing
 
 # ---- Audio cues (short files placed next to this script) ----
-SFX_START = "sfx_start_new.wav"   # 7s audio with 2s fade
-SFX_END   = "sfx_end_new.wav"     # end sound
+SFX_START = "sfx_magic.mp3"      # Plays when mic is ready - user can speak
+SFX_END   = "sfx_generate.mp3"   # Plays when AI starts generating
 
 # LED control usually shares the same board/port
 LED_PORT = PORT  # override with --port if you use a separate LED Arduino
@@ -78,11 +78,11 @@ def record_and_transcribe():
         with mic as source:
             recognizer.adjust_for_ambient_noise(source, duration=1.0)
             # Settings tuned for noisy environments
-            recognizer.pause_threshold = 1.2  # Shorter pause to detect end of speech
-            recognizer.energy_threshold = 1000  # Higher threshold to ignore background noise
+            recognizer.pause_threshold = 1.5  # Allow pauses while thinking through question
+            recognizer.energy_threshold = 1300  # High threshold to filter background noise
             recognizer.dynamic_energy_threshold = False  # Use fixed threshold
-            # Reasonable limits for questions
-            audio = recognizer.listen(source, timeout=10, phrase_time_limit=15)
+            # Strict limits - questions should be concise
+            audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)
 
         print("  🧠 Transcribing...")
         text = recognizer.recognize_google(audio)
@@ -103,24 +103,21 @@ def record_and_transcribe():
 
 def record_and_transcribe_with_timeout():
     """Wrapper to enforce timeout on recording/transcription."""
-    result = {"text": None}
-
-    def record_wrapper():
-        result["text"] = record_and_transcribe()
-        return result["text"]
-
     with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(record_wrapper)
+        future = executor.submit(record_and_transcribe)
         try:
             return future.result(timeout=TIMEOUT_RECORDING)
         except TimeoutError:
             print(f"  ⚠ Recording timeout ({TIMEOUT_RECORDING}s exceeded)")
-            # Wait briefly for transcription to complete (it may have captured audio)
-            time.sleep(2)
-            # Check if we got results after timeout
-            if result["text"]:
-                print(f"  → Using transcription that completed during timeout: {result['text']}")
-                return result["text"]
+            print(f"  → Waiting for transcription to complete...")
+            # Give transcription extra time to finish (Google API call)
+            try:
+                result = future.result(timeout=5)  # Additional 5s for transcription
+                if result:
+                    print(f"  ✓ Got transcription: {result}")
+                    return result
+            except TimeoutError:
+                print(f"  ✗ Transcription also timed out")
             return None
         except Exception as e:
             print(f"  ⚠ Unexpected error during recording: {e}")
@@ -226,14 +223,9 @@ def on_coin_event(pulses: int, dry_run: bool = False):
     led = LedClient(LED_PORT, BAUD)
 
     try:
-        # Start cue: quick pulse + short sting
-        led.start("PULSE")
-        afplay(SFX_START)
-        led.stop()
-
         # Step 1: Record and transcribe (with timeout) — show "listening"
-        # Note: ambient noise calibration (0.5s) provides natural delay after audio
         led.start("GLOW")
+        afplay(SFX_START)  # Play magic sound to signal user can speak
         question = record_and_transcribe_with_timeout()
         led.stop()
 
@@ -244,6 +236,7 @@ def on_coin_event(pulses: int, dry_run: bool = False):
 
         # Step 2: Generate fortune (with timeout) — show "thinking"
         led.start("SPARKLE")
+        afplay(SFX_END)  # Play generate sound to signal AI is working
         fortune = generate_fortune_with_timeout(question)
         if not fortune:
             led.stop()
@@ -258,11 +251,6 @@ def on_coin_event(pulses: int, dry_run: bool = False):
             print_fallback(dry_run)
         finally:
             led.stop()
-
-        # End cue: brief pulse + short sting (visually “done”)
-        led.start("PULSE")
-        afplay(SFX_END)
-        led.stop()
 
     except Exception as e:
         print(f"  ✗ Unexpected error in coin event handler: {e}")

@@ -50,10 +50,10 @@ python serial_trigger.py --mode hardware --port /dev/cu.usbmodem143101
 
 The orchestrator (`serial_trigger.py`) coordinates the full fortune-telling flow:
 
-1. **Coin inserted** → Arduino sends `COIN X` message over serial
+1. **Coin inserted** → Arduino sends `COIN X` message over serial (115200 baud)
 2. **Microphone activates** → Records spoken question (15s timeout)
-3. **Speech-to-text** → Transcribes audio using Google STT
-4. **AI generates fortune** → Calls OpenAI/Anthropic API (30s timeout)
+3. **Speech-to-text** → Transcribes audio via Google Web Speech API (`speech_recognition` library)
+4. **AI generates fortune** → Calls OpenAI API (30s timeout)
 5. **Prints fortune** → Outputs to thermal printer (10s timeout)
 6. **Fallback handling** → If any step fails, prints "Narly drifted off..."
 
@@ -86,32 +86,9 @@ Non-devs can edit `prompts.md` to adjust the tone, rules, and header/footer.
 
 ---
 
-## Development Notes
-
-### For Developers Without Hardware
-Use simulation mode to develop and test without needing the physical Arduino or coin acceptor:
-```bash
-python serial_trigger.py --mode simulate --dry-run
-```
-Press ENTER to trigger the full fortune cycle (mic → AI → print).
-
-### Timeout Configuration
-Adjust timeouts in `serial_trigger.py` if needed:
-- `TIMEOUT_RECORDING = 15` (seconds for mic input)
-- `TIMEOUT_AI = 30` (seconds for AI response)
-- `TIMEOUT_PRINT = 10` (seconds for printer)
-
-### Deprecated Scripts
-- `mic_trigger.py` - functionality now integrated into orchestrator
-- Old `serial_trigger.py` logic replaced with full orchestration
-
----
-
 ## Next Steps
-- Add sound/LED feedback in Arduino when printing starts
-- Implement voice activity detection for better recording experience
-- Add metrics/logging for festival operation monitoring
-- Optional: Add HTTP API for remote monitoring/debugging
+- Add sound/LED feedback in Arduino when printing starts.
+- Optional: Wrap the orchestrator in a simple HTTP API for remote debugging.
 
 ---
 

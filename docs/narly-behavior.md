@@ -53,15 +53,13 @@ Narly: Behavior & Technical Brief
 
     -   `pyserial` (serial comms).
 
-    -   `sounddevice` or `pyaudio` (mic capture).
+    -   `speech_recognition` (mic capture and transcription via Google Web Speech API).
 
-    -   **Google Cloud Speech-to-Text** (speech recognition).
+    -   `openai` (AI responses).
 
-    -   `openai` or `anthropic` (AI responses, depending on provider).
+    -   `python-escpos` or system `lpr` (ESC/POS printing).
 
-    -   `python-escpos` or similar (ESC/POS printing).
-
-    -   `typer` (CLI), `pydantic` (config), `pytest` (testing).
+    -   `argparse` (CLI).
 
 * * * * *
 
@@ -72,23 +70,23 @@ Narly: Behavior & Technical Brief
 
 -   Detects coin pulses via interrupt on HX-916 signal wire.
 
--   Debounces and emits **exactly one JSON event per coin**.
+-   Debounces and emits **exactly one `COIN X` message per coin** (where X is the pulse count).
 
 -   Drives all **LED animations** locally (idle shimmer + oracle pulse).
 
--   Sends serial messages to laptop over USB (9600 baud, newline-terminated JSON).
+-   Sends serial messages to laptop over USB (115200 baud, newline-terminated plain text).
 
 ### Laptop (Python app in `fortune-service/NarlyFortuneTeller/`)
 
--   **Serial listener:** waits for `{"event":"coin"}` messages.
+-   **Serial listener:** waits for `COIN X` messages (e.g., `COIN 1`).
 
 -   **Audio capture:** starts mic recording on coin event; stops on voice activity end or timeout.
 
--   **Speech recognition:** sends audio to Google Speech-to-Text for transcription.
+-   **Speech recognition:** transcribes audio via Google Web Speech API (`speech_recognition` library).
 
--   **Fortune generation:** builds a prompt and calls the LLM API (OpenAI/Anthropic).
+-   **Fortune generation:** builds a prompt and calls the OpenAI API.
 
--   **Printing:** formats the fortune as ESC/POS commands, sends to USB thermal printer.
+-   **Printing:** formats the fortune and sends to thermal printer (via USB escpos or system lpr).
 
 -   **Error handling:** if STT/LLM/printer fails, prints a fallback slip.
 
@@ -107,21 +105,23 @@ Narly: Behavior & Technical Brief
 
     -   Arduino detects valid pulse → sends:
 
-        `{"event":"coin","value":1,"ts":1730000000}`
+        `COIN 1`
 
     -   LEDs switch to "oracle pulse."
 
 3.  **Laptop on Coin Event**
 
-    -   Plays "thinking" SFX.
+    -   Plays sound effect (sfx_magic.mp3) signaling mic is ready.
 
     -   Captures audio from MXL AC-404 (or system input).
 
 4.  **Fortune Generation**
 
-    -   Audio → Google STT → transcript.
+    -   Plays sound effect (sfx_generate.mp3) signaling AI is working.
 
-    -   Transcript + prompt → AI → fortune text.
+    -   Audio → Google Web Speech API → transcript.
+
+    -   Transcript + prompt → OpenAI → fortune text.
 
 5.  **Printing**
 
