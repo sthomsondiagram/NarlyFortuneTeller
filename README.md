@@ -1,94 +1,125 @@
-# Fortune Service (Narly Prototype)
+# Narly the Narwhal — Fortune Teller
 
-This is the **Coin → Mic → AI → Print pipeline** for Narly the Narwhal.
-When a coin is inserted, Narly listens for a spoken question, gets a response from an AI model, formats it into a fortune, and prints it to a thermal printer.
+A coin-operated AI fortune teller for festivals. When a coin is inserted, Narly listens for a spoken question, generates a fortune via OpenAI, and prints it on a thermal receipt printer.
+
+**Pipeline:** Coin → Mic → Speech-to-Text → OpenAI → Thermal Printer
+
+---
+
+## Project Structure
+
+```
+NarlyFortuneTeller/
+  personas/
+    default/              # General sea-mystic Narly (use for any event)
+    umbraco-2025/         # Umbraco US Festival 2025 persona
+  sfx/                    # Sound effect files (mp3)
+  arduino/
+    fortune-controller/   # Arduino sketch (coin detection + LED control)
+  docs/
+    narly-behavior.md     # Full behavior and hardware reference
+    v2-upgrade-plan.md    # V2 upgrade plan and progress tracking
+  serial_trigger.py       # Main entry point (coin → mic → AI → print)
+  app.py                  # Standalone test (skips coin and mic)
+  ai_client.py            # OpenAI integration
+  config_loader.py        # Persona-aware config loader
+  formatters.py           # Thermal printer ticket formatter
+  print_client.py         # Thermal printer driver
+  led_client.py           # Arduino LED control via serial
+```
+
+---
 
 ## Getting Started
 
 ### 1. Clone the repo
 ```bash
 git clone https://github.com/sthomsondiagram/NarlyFortuneTeller.git
-cd fortune-service
+cd fortune-service/NarlyFortuneTeller
 ```
 
 ### 2. Set up Python environment
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate   # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ### 3. Configure environment
-Copy `.env.example` → `.env` and edit with your API keys and printer configuration.
+Copy `.env.example` → `.env` and fill in your API keys and printer settings.
 
-### 4. Run the orchestrator
+---
 
-**For developers without hardware (simulation mode):**
+## Running the App
+
+### Simulation mode (no hardware needed)
 ```bash
-# Test the full flow without Arduino - press ENTER to simulate coin insertion
+# Press ENTER to simulate a coin insertion
 python serial_trigger.py --mode simulate --dry-run
 
-# Auto-trigger coins every 10 seconds for continuous testing
+# Auto-trigger every 10 seconds
 python serial_trigger.py --mode simulate --auto --interval 10 --dry-run
 ```
 
-**With hardware (real Arduino + coin acceptor):**
+### Hardware mode (Arduino + printer connected)
 ```bash
-# Test with dry-run (shows output without printing)
+# Test without printing
 python serial_trigger.py --mode hardware --dry-run
 
-# Production mode (actually prints to thermal printer)
+# Production — actually prints
 python serial_trigger.py --mode hardware
 
-# Specify custom serial port
+# Specify serial port manually if auto-detect fails
 python serial_trigger.py --mode hardware --port /dev/cu.usbmodem143101
 ```
 
----
-
-## How It Works
-
-The orchestrator (`serial_trigger.py`) coordinates the full fortune-telling flow:
-
-1. **Coin inserted** → Arduino sends `COIN X` message over serial (115200 baud)
-2. **Microphone activates** → Records spoken question (15s timeout)
-3. **Speech-to-text** → Transcribes audio via Google Web Speech API (`speech_recognition` library)
-4. **AI generates fortune** → Calls OpenAI API (30s timeout)
-5. **Prints fortune** → Outputs to thermal printer (10s timeout)
-6. **Fallback handling** → If any step fails, prints "Narly drifted off..."
-
-### Key Features
-
-- ✅ **Timeout protection** - prevents hanging on mic/AI/printer failures
-- ✅ **Error resilience** - fallback printing when things go wrong
-- ✅ **Simulation mode** - test without Arduino hardware
-- ✅ **Dry-run mode** - preview output without printing
-- ✅ **Single-process** - no subprocess complexity, easier debugging
-
----
-
-## Alternative: Standalone Testing
-
-For quick tests without the full orchestrator:
-
+### Quick standalone test (no coin, no mic)
 ```bash
-# Test with a specific question (no mic, no coin)
-python app.py --question "Will I meet a dragon today?" --dry-run
-
-# Use default question from content.json
-python app.py --dry-run
+python app.py --question "Will I find treasure today?" --dry-run
 ```
 
 ---
 
-## Editing Persona & Style
-Non-devs can edit `prompts.md` to adjust the tone, rules, and header/footer.
+## Personas
+
+Narly supports multiple personas. Each persona has its own prompt and config in `personas/<name>/`.
+
+```bash
+# List available personas
+python serial_trigger.py --list-personas
+
+# Run with a specific persona
+python serial_trigger.py --mode simulate --dry-run --persona umbraco-2025
+```
+
+To create a new persona, copy `personas/default/` to a new directory and edit `prompts.md` and `content.json`.
 
 ---
 
-## Next Steps
-- Add sound/LED feedback in Arduino when printing starts.
-- Optional: Wrap the orchestrator in a simple HTTP API for remote debugging.
+## Key Features
+
+- **Persona system** — swap event-specific personalities at startup with `--persona`
+- **Timeout protection** — mic, AI, and printer all have timeouts to prevent hanging
+- **Error resilience** — fallback fortune printed if any step fails
+- **Simulation mode** — full test without Arduino hardware
+- **Dry-run mode** — preview ticket output without printing
+
+---
+
+## Editing a Persona
+
+Non-developers can edit `personas/default/prompts.md` to adjust Narly's tone, rules, and personality. The `content.json` in the same folder controls the ticket header, footer, and default question.
+
+---
+
+## Hardware
+
+See `docs/narly-behavior.md` for full hardware details. Key components:
+- Arduino Uno (coin detection + LED control)
+- HX-916 coin acceptor
+- WS2812B LED strip (60 LEDs, 5V external supply)
+- MXL AC-404 USB microphone
+- Maikrt 58mm thermal receipt printer
 
 ---
 

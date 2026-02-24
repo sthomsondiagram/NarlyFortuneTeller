@@ -68,9 +68,11 @@ New Arduino -> Python messages:
 - `PIR ON` / `PIR OFF` — presence sensor state change
 - `SWITCH DEMO` / `SWITCH QUIET` / `SWITCH DEBUG` — toggle switch changed
 
-### 2b. Expand Arduino sketch (`arduino/fortune-controller/fortune-controller.ino`)
+### 2b. Rewrite Arduino sketch (`arduino/fortune-controller/fortune-controller.ino`)
 
-Starting from the current sketch (coin on pin 2, LEDs on pin 6, 60 WS2812B):
+**Note:** The V1 sketch has LED code but LEDs were never working (likely a wiring issue). The sketch will be rewritten from scratch for Phase 2 with fresh LED wiring and tested incrementally. Only the coin detection logic (pin 2, interrupt-based, debounced) is known-good and will be carried forward.
+
+Starting from scratch (keeping coin detection on pin 2, LEDs on pin 6, 60 WS2812B):
 - Add PIR sensor on pin 4 (HC-SR501 from Elegoo kit)
 - Add two toggle switches on pins 7 & 8 (INPUT_PULLUP, active low)
   - Both off = DEMO, A on = QUIET, B on = DEBUG
