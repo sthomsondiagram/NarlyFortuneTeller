@@ -70,7 +70,7 @@ python serial_trigger.py --mode hardware --dry-run
 python serial_trigger.py --mode hardware
 
 # Specify serial port manually if auto-detect fails
-python serial_trigger.py --mode hardware --port /dev/cu.usbmodem143101
+python serial_trigger.py --mode hardware --port /dev/cu.usbmodem143301
 ```
 
 ### Quick standalone test (no coin, no mic)

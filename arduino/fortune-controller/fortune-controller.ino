@@ -9,7 +9,7 @@ const unsigned long DEBOUNCE_MS = 8;
 
 // LED setup
 #define LED_PIN 6
-#define NUM_LEDS 60
+#define NUM_LEDS 180
 #define LED_TYPE WS2812B
 #define COLOR_ORDER GRB
 

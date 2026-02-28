@@ -30,7 +30,7 @@ except Exception:
 _BASE_DIR = Path(__file__).resolve().parent
 
 # ---- Serial config ----
-PORT = "/dev/cu.usbmodem143101"  # Change to your Arduino port, e.g. "COM4" on Windows
+PORT = "/dev/cu.usbmodem143301"  # Change to your Arduino port, e.g. "COM4" on Windows
 BAUD = 115200
 
 # ---- Timeout configuration (in seconds) ----
