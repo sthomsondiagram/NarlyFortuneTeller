@@ -239,7 +239,7 @@ def on_coin_event(pulses: int, dry_run: bool = False):
             print(f"  → Using default question: {question}")
 
         # Step 2: Generate fortune (with timeout) — show "thinking"
-        led.start("SPARKLE")
+        led.start("PULSE")
         afplay(SFX_END)  # Play generate sound to signal AI is working
         fortune = generate_fortune_with_timeout(question)
         if not fortune:
@@ -260,6 +260,7 @@ def on_coin_event(pulses: int, dry_run: bool = False):
         print(f"  ✗ Unexpected error in coin event handler: {e}")
         print_fallback(dry_run)
     finally:
+        led.stop()
         led.close()
 
 # ----------------------------------------
@@ -315,6 +316,13 @@ def listen_serial_mode(port: str, dry_run: bool = False):
 def simulate_mode(dry_run: bool = False, auto: bool = False, interval: int = 10):
     """Simulate coin events for testing without hardware."""
     print("🎮 Simulation mode")
+
+    # Reset LEDs to DIM on startup (clears any leftover state from previous session)
+    print("   Initializing LEDs...")
+    led_init = LedClient(LED_PORT, BAUD)
+    led_init.stop()
+    led_init.close()
+    print("   LEDs ready\n")
     if auto:
         print(f"   Auto-triggering every {interval} seconds (Ctrl+C to stop)\n")
         try:

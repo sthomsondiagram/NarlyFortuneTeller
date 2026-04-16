@@ -15,9 +15,10 @@ const unsigned long DEBOUNCE_MS = 8;
 
 CRGB leds[NUM_LEDS];
 
-String ledMode = "OFF";
+String ledMode = "DIM";
 unsigned long lastLedUpdate = 0;
 uint8_t gHue = 0;
+uint8_t glowBrightness = 20;  // tracks fade-in from DIM level
 
 void onPulse() {
   unsigned long now = millis();
@@ -66,13 +67,12 @@ void loop() {
     
     if (cmd.startsWith("START ")) {
       ledMode = cmd.substring(6);
+      if (ledMode == "GLOW") glowBrightness = 20;  // reset for fade-in
       Serial.print("LED mode set to: ");  // DEBUG
       Serial.println(ledMode);             // DEBUG
     } else if (cmd == "STOP") {
-      ledMode = "OFF";
-      Serial.println("LED mode: OFF");  // DEBUG
-      FastLED.clear();
-      FastLED.show();
+      ledMode = "DIM";
+      Serial.println("LED mode: DIM");  // DEBUG
     }
   }
   
@@ -80,13 +80,18 @@ void loop() {
   if (millis() - lastLedUpdate > 30) {
     lastLedUpdate = millis();
     
-    if (ledMode == "GLOW") {
-      fill_solid(leds, NUM_LEDS, CRGB::Purple);
+    if (ledMode == "DIM") {
+      fill_solid(leds, NUM_LEDS, CHSV(192, 200, 20));  // dim purple, ~8% brightness
+      FastLED.show();
+    }
+    else if (ledMode == "GLOW") {
+      glowBrightness = qadd8(glowBrightness, 4);  // ramp up ~875ms, saturates at 255
+      fill_solid(leds, NUM_LEDS, CHSV(192, 255, glowBrightness));
       FastLED.show();
     }
     else if (ledMode == "PULSE") {
-      uint8_t breath = beatsin8(20, 50, 255);
-      fill_solid(leds, NUM_LEDS, CHSV(200, 255, breath));
+      uint8_t breath = beatsin8(15, 60, 255);           // slow breath, warm amber/gold
+      fill_solid(leds, NUM_LEDS, CHSV(40, 255, breath));
       FastLED.show();
     }
     else if (ledMode == "SPARKLE") {

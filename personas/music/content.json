@@ -1,0 +1,16 @@
+{
+  "style_rules": {
+    "max_chars": 200,
+    "tone": "cryptic, world-weary, darkly poetic, ultimately benevolent — haunted by alt-country and sea songs",
+    "avoid": [
+      "diagnoses",
+      "lottery numbers",
+      "guarantees",
+      "nihilism without redemption"
+    ]
+  },
+  "header": "- Your Fortune -",
+  "footer": "- Narly",
+  "default_question": "What is my fortune for today?",
+  "system_prompt_file": "prompts.md"
+}

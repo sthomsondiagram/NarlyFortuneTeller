@@ -52,30 +52,37 @@ Copy `.env.example` → `.env` and fill in your API keys and printer settings.
 
 ## Running the App
 
+> **Working directory:** Run all commands from the repo root (`fortune-service/`), with the venv activated.
+
 ### Simulation mode (no hardware needed)
 ```bash
 # Press ENTER to simulate a coin insertion
-python serial_trigger.py --mode simulate --dry-run
+python NarlyFortuneTeller/serial_trigger.py --mode simulate --dry-run
+
+python serial_trigger.py --persona music --mode simulate --dry-run
+
 
 # Auto-trigger every 10 seconds
-python serial_trigger.py --mode simulate --auto --interval 10 --dry-run
+python NarlyFortuneTeller/serial_trigger.py --mode simulate --auto --interval 10 --dry-run
 ```
 
 ### Hardware mode (Arduino + printer connected)
 ```bash
 # Test without printing
-python serial_trigger.py --mode hardware --dry-run
+python NarlyFortuneTeller/serial_trigger.py --mode hardware --dry-run
 
 # Production — actually prints
-python serial_trigger.py --mode hardware
+python NarlyFortuneTeller/serial_trigger.py --mode hardware
+
+python serial_trigger.py --persona music --mode hardware
 
 # Specify serial port manually if auto-detect fails
-python serial_trigger.py --mode hardware --port /dev/cu.usbmodem143301
+python NarlyFortuneTeller/serial_trigger.py --mode hardware --port /dev/cu.usbmodem143301
 ```
 
 ### Quick standalone test (no coin, no mic)
 ```bash
-python app.py --question "Will I find treasure today?" --dry-run
+python NarlyFortuneTeller/app.py --question "Will I find treasure today?" --dry-run
 ```
 
 ---
@@ -86,10 +93,10 @@ Narly supports multiple personas. Each persona has its own prompt and config in 
 
 ```bash
 # List available personas
-python serial_trigger.py --list-personas
+python NarlyFortuneTeller/serial_trigger.py --list-personas
 
 # Run with a specific persona
-python serial_trigger.py --mode simulate --dry-run --persona umbraco-2025
+python NarlyFortuneTeller/serial_trigger.py --mode simulate --dry-run --persona umbraco-2025
 ```
 
 To create a new persona, copy `personas/default/` to a new directory and edit `prompts.md` and `content.json`.
